@@ -29,6 +29,9 @@
 - Local evaluator + error visualization. Apply to baseline: what's actually going wrong?
 - *Error analysis!*
 
+**Notes**
+- Time the time per image. Test has 254, but we dont know how many will be during eval
+
 **6. Research the space (~25 min)**
 - What problem category is this? What solution types dominate?
 - Don't over-analyze! Note down 2–7 different models/algorithms/approaches to try rapidly.

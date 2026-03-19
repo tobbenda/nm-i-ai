@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Task Progression Checklist.md",
+                "file": "results.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Task Progression Checklist"
+              "title": "results"
             }
           }
         ]
@@ -94,7 +94,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "Task Progression Checklist.md",
+                "file": "results.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -104,7 +104,7 @@
                 "unlinkedCollapsed": true
               },
               "icon": "links-coming-in",
-              "title": "Backlinks for Task Progression Checklist"
+              "title": "Backlinks for results"
             }
           },
           {
@@ -113,12 +113,12 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "Task Progression Checklist.md",
+                "file": "results.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               },
               "icon": "links-going-out",
-              "title": "Outgoing links from Task Progression Checklist"
+              "title": "Outgoing links from results"
             }
           },
           {
@@ -156,13 +156,13 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "Task Progression Checklist.md",
+                "file": "results.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
               },
               "icon": "lucide-list",
-              "title": "Outline of Task Progression Checklist"
+              "title": "Outline of results"
             }
           }
         ]
@@ -184,5 +184,12 @@
     }
   },
   "active": "91c73eea9a0bc2d7",
-  "lastOpenFiles": []
+  "lastOpenFiles": [
+    "archive.md",
+    "results.md",
+    "Pasted image 20260319191654.png",
+    "architecture.md",
+    "Task Progression Checklist.md",
+    "Work Doc.md"
+  ]
 }

@@ -1,0 +1,16 @@
+# Data & weights
+data/
+*.zip
+*.pt
+*.onnx
+*.safetensors
+
+# Test/submission artifacts
+test_input/
+sandbox_test/
+submission/
+output/
+
+# Misc
+excalidraw.log
+__pycache__/
