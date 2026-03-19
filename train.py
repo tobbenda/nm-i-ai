@@ -109,7 +109,7 @@ def main():
         patience=15,
         save=True,
         project="runs",
-        name="a100_finetune_v2",
+        name="a100_finetune",
         # Augmentation
         mosaic=1.0,
         mixup=0.1,

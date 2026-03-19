@@ -21,4 +21,15 @@ ___
 19 19:10 - Upgraded to YOLOv8x + imgsz=1280, jumped from 19→48 detections on 3 images (~18% recall vs ~270 actual). No more quick fixes without fine-tuning
 19 19:12 - Created submission.zip (131 MB) — verified against all submission requirements, ready to upload
 19 19:14 - Sandbox simulation passed — unzipped, ran from clean dir, output format validated
-19 19:14 - Created A100 40GB VM on GCP (us-central1-a, europe was stocked out), verified GPU and SSH access
+19 19:14 - (agent) Created A100 40GB VM on GCP (us-central1-a, europe was stocked out), verified GPU and SSH access
+19 19:32 - Built evaluate.py with HTML report (mAP, overlays, error categories, heatmaps, confidence dist). Baseline: det_mAP=0.0096, final=0.0067
+19 19:42 - Analyzed GT annotations: not all shelf products are annotated (e.g. Natreen missing from categories). Discussed mAP scoring mechanics — low-conf spam is nearly free, high-conf FPs are devastating, IoU@0.5 is lenient
+19 19:46 - (agent) Uploaded data + train.py to A100 VM, installed deps, started YOLOv8x fine-tuning (100 epochs, imgsz=1280, batch=4). Training running ~4.5 it/s
+19 19:53 - Error analysis: 3.6% recall, 77% FPs, model predicts COCO classes (bottle/book/bowl). Fine-tuning is the critical next step
+19 19:59 - Decided on Approach 1: end-to-end YOLOv8x nc=357. Stable/simple first, split pipeline only if classification becomes bottleneck
+19 19:55 - (agent) Moved training work to separate worktree (nm-1-training, branch: training). Training at epoch 34/100, mAP@0.5=0.677
+19 19:59 - (agent) Training complete — early stopped at epoch 57, best at epoch 42. mAP@0.5=0.685, mAP@0.5:0.95=0.448 (up from 0.0096 baseline)
+19 20:04 - (agent) Downloaded best.pt, created build_submission.sh (12 automated validation checks), built submission.zip (120MB, all checks pass)
+19 21:59 - (agent) Re-read competition docs — found critical issue: trained with ultralytics 8.4.24 but sandbox has 8.1.0 (weights incompatible). Need to retrain pinned or export ONNX
+19 22:19 - (agent) Fixed: retrained with ultralytics==8.1.0, removed torch.load patch from run.py, added security scan to build script. Training v2 running on A100
+19 22:51 - (agent) Training v2 complete — mAP@0.5=0.682, mAP@0.5:0.95=0.453. Downloaded best.pt, rebuilt submission.zip (120MB, all checks pass). Ready to upload
