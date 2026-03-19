@@ -2,15 +2,6 @@ import argparse
 import json
 from pathlib import Path
 import torch
-
-# Sandbox has torch 2.6.0 which defaults weights_only=True,
-# but ultralytics 8.1.0 needs weights_only=False to load .pt files
-_original_load = torch.load
-def _patched_load(*args, **kwargs):
-    kwargs.setdefault("weights_only", False)
-    return _original_load(*args, **kwargs)
-torch.load = _patched_load
-
 from ultralytics import YOLO
 
 
@@ -21,7 +12,7 @@ def main():
     args = parser.parse_args()
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    model = YOLO("yolov8x.pt")
+    model = YOLO(str(Path(__file__).parent / "best.pt"))
     predictions = []
 
     for img in sorted(Path(args.input).iterdir()):
