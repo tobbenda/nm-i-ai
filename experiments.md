@@ -2,59 +2,53 @@
 
 Focus: **Detection mAP@0.5** (70% of competition score)
 
-## Baseline
+## Baseline (ONNX)
 
 | Experiment | det_mAP | cls_mAP | Final | Notes |
 |---|---|---|---|---|
-| v2-baseline (YOLOv8x, imgsz=1280, conf=0.01) | 0.9003 | 0.8191 | 0.8760 | ultralytics==8.1.0, eval_quick.py on val split |
+| yolo_imgsz1536 (ONNX, conf=0.01, NMS=0.5) | **0.9107** | 0.8252 | 0.8850 | Current best submission |
 
-## Phase 1a: Inference-time experiments (v2-baseline weights)
+## Phase 1: Inference tuning (no retraining)
 
 | # | Change | det_mAP | Δ det | Notes |
 |---|---|---|---|---|
-| E1 | conf=0.05 | 0.8907 | +0.007 | |
-| E2 | conf=0.2 | 0.8680 | -0.015 | too aggressive filter |
 | E3 | conf=0.01 | 0.9003 | +0.017 | sweet spot |
 | E4 | conf=0.01 + TTA | 0.9019 | +0.019 | best with baseline weights |
-| E5 | conf=0.01 + NMS=0.5 | 0.9010 | +0.018 | |
-| E6 | conf=0.01 + NMS=0.9 | 0.8833 | +0.000 | too many overlaps |
-| E7 | conf=0.01 + imgsz=1536 | 0.8957 | +0.012 | |
-| E8 | conf=0.05 + TTA | 0.8970 | +0.014 | |
-| E9 | conf=0.01 + TTA + imgsz=1536 | 0.9013 | +0.018 | |
-| E10 | last.pt + conf=0.01 | 0.9017 | +0.018 | |
-| E11 | conf=0.001 | 0.9017 | +0.018 | diminishing returns |
+| T2d | conf=0.01 + NMS=0.5 (imgsz1536 model) | 0.9055 | +0.005 | best .pt config |
+| **ONNX** | **ONNX export + conf=0.01 + NMS=0.5** | **0.9107** | **+0.010** | **ONNX graph optimization helped** |
 
-## Phase 1b: Training experiments (on A100)
+## Phase 2: Training experiments
 
-All evaluated with conf=0.01, default NMS.
-
-| # | Change | det_mAP | Δ det | Verdict |
+| # | Experiment | det_mAP | Δ det | Verdict |
 |---|---|---|---|---|
-| T1 | YOLOv8l | 0.8987 | -0.002 | worse — bigger model wins |
-| **T2** | **YOLOv8x imgsz=1536** | **0.9047** | **+0.004** | **best training config** |
-| T3 | Heavy aug (mixup=0.3, cp=0.3) | 0.8926 | -0.008 | too much aug hurts |
-| T4 | Lower LR (0.0005) | 0.8912 | -0.009 | default LR better |
-| T5 | SGD (lr=0.01) | 0.8937 | -0.007 | AdamW better |
+| T1 | YOLOv8l | 0.8987 | -0.012 | smaller model worse |
+| **T2** | **YOLOv8x imgsz=1536** | **0.9047** | — | **best training config** |
+| T3 | Heavy aug (mixup=0.3, cp=0.3) | 0.8926 | -0.012 | hurts |
+| T4 | Lower LR (0.0005) | 0.8912 | -0.014 | hurts |
+| T5 | SGD (lr=0.01) | 0.8937 | -0.011 | AdamW better |
+| T6 | Synthetic product ref images | 0.525 | -0.380 | naive cutout pasting is too artificial |
+| T7 | RT-DETR-l | 0.000 | -0.905 | transformer needs more data |
+| T8 | yolo_tuned (cls=1.0, multi_scale, no cp) | | | **running on VM1** |
+| T9 | yolo_fulldata (all 248 imgs, 50 epochs) | | | **running on VM2** |
 
-## Phase 1c: Inference tuning on T2 (imgsz=1536 model)
+## Phase 3: Inference architecture changes
 
-| # | Config | det_mAP | Δ det | Notes |
+| # | Approach | det_mAP | Δ det | Verdict |
 |---|---|---|---|---|
-| T2a | conf=0.01 (default) | 0.9047 | — | |
-| T2b | conf=0.01 + TTA | 0.8937 | -0.011 | TTA hurts this model! |
-| T2c | conf=0.01 + TTA + imgsz=1536 | 0.9002 | -0.005 | still worse |
-| **T2d** | **conf=0.01 + NMS=0.5** | **0.9055** | **+0.001** | **overall best** |
-| T2e | conf=0.005 | 0.9051 | +0.000 | no gain |
+| S1 | SAHI tiling (1024px, 20% overlap) | 0.8798 | -0.031 | worse — too many FPs from tile boundaries |
 
 ## Current Best Config
-- **Model:** YOLOv8x trained at imgsz=1536 (`runs/exp_imgsz1536/weights/best.pt`)
-- **Inference:** conf=0.01, imgsz=1536, iou(NMS)=0.5, no TTA
-- **det_mAP = 0.9055, final = 0.8843**
+- **Model:** YOLOv8x trained at imgsz=1536, exported to ONNX
+- **Inference:** ONNX + conf=0.01 + NMS=0.5
+- **det_mAP = 0.9107, cls_mAP = 0.8252, final = 0.8850**
 
 ## Key Learnings
-1. **Lower confidence threshold** is essentially free — 0.1→0.01 gives +1.7% det_mAP
-2. **Training at higher resolution** (1536) helps more than any augmentation or optimizer change
-3. **TTA helps baseline model but hurts the 1536 model** — the model already sees enough detail
-4. **NMS=0.5** slightly better than 0.7 for dense shelf products (overlapping boxes)
-5. **Heavy augmentation, lower LR, SGD all hurt** — baseline hyperparams were near-optimal
-6. **YOLOv8x > YOLOv8l** — despite only 248 images, the larger model generalizes better
+1. Lower conf threshold (0.1→0.01) = +1.7% det_mAP (free)
+2. Training at imgsz=1536 > 1280 (+0.4%)
+3. ONNX export adds another +0.5% via graph optimization
+4. TTA helps baseline but hurts 1536 model
+5. NMS=0.5 > 0.7 for dense products
+6. Heavy aug / lower LR / SGD / YOLOv8l all worse
+7. RT-DETR needs much more data — dead end
+8. Naive synthetic augmentation hurts badly
+9. SAHI tiling hurts — model at 1536 already handles resolution well
