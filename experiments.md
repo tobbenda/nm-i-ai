@@ -28,8 +28,8 @@ Focus: **Detection mAP@0.5** (70% of competition score)
 | T5 | SGD (lr=0.01) | 0.8937 | -0.011 | AdamW better |
 | T6 | Synthetic product ref images | 0.525 | -0.380 | naive cutout pasting is too artificial |
 | T7 | RT-DETR-l | 0.000 | -0.905 | transformer needs more data |
-| T8 | yolo_tuned (cls=1.0, multi_scale, no cp) | | | **running on VM1** |
-| T9 | yolo_fulldata (all 248 imgs, 50 epochs) | | | **running on VM2** |
+| T8 | yolo_tuned (cls=1.0, multi_scale, no cp) | ~0.653 | -0.035 | worse — killed early |
+| T9 | yolo_fulldata (all 248 imgs, 50 epochs) | N/A | N/A | done, can't eval locally (trained on all data) |
 
 ## Phase 3: Inference architecture changes
 
