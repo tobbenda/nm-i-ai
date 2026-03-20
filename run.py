@@ -8,7 +8,7 @@ import onnxruntime as ort
 from ensemble_boxes import weighted_boxes_fusion
 
 
-def preprocess(img_arr, imgsz=1536, dtype=np.float16):
+def preprocess(img_arr, imgsz=1536):
     """Letterbox resize + normalize for YOLO ONNX."""
     orig_h, orig_w = img_arr.shape[:2]
     scale = min(imgsz / orig_w, imgsz / orig_h)
@@ -20,7 +20,7 @@ def preprocess(img_arr, imgsz=1536, dtype=np.float16):
     padded[pad_y:pad_y + new_h, pad_x:pad_x + new_w] = np.array(img)
 
     arr = padded.astype(np.float32) / 255.0
-    arr = np.transpose(arr, (2, 0, 1))[np.newaxis, ...].astype(dtype)
+    arr = np.transpose(arr, (2, 0, 1))[np.newaxis, ...].astype(np.float16)
     return arr, scale, pad_x, pad_y
 
 
@@ -65,11 +65,13 @@ def main():
     base = Path(__file__).parent
     providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
 
-    # Load both models
-    sess_1536 = ort.InferenceSession(str(base / "model_1536.onnx"), providers=providers)
-    sess_1280 = ort.InferenceSession(str(base / "model_1280.onnx"), providers=providers)
-    name_1536 = sess_1536.get_inputs()[0].name
-    name_1280 = sess_1280.get_inputs()[0].name
+    # Load 3 models: A@1536, B@1536, A@1280
+    models = [
+        (ort.InferenceSession(str(base / "model_a_1536.onnx"), providers=providers), 1536),
+        (ort.InferenceSession(str(base / "model_b_1536.onnx"), providers=providers), 1536),
+        (ort.InferenceSession(str(base / "model_a_1280.onnx"), providers=providers), 1280),
+    ]
+    weights = [1.0, 0.8, 0.6]
 
     predictions = []
 
@@ -80,25 +82,19 @@ def main():
         img_arr = np.array(Image.open(img_path).convert("RGB"))
         h, w = img_arr.shape[:2]
 
-        # Run both models
-        inp1, s1, px1, py1 = preprocess(img_arr, 1536)
-        out1 = sess_1536.run(None, {name_1536: inp1})
-        b1, sc1, c1 = decode(out1[0], s1, px1, py1, w, h, 0.01)
-
-        inp2, s2, px2, py2 = preprocess(img_arr, 1280)
-        out2 = sess_1280.run(None, {name_1280: inp2})
-        b2, sc2, c2 = decode(out2[0], s2, px2, py2, w, h, 0.01)
-
-        boxes_list = [b1.tolist() if len(b1) > 0 else [],
-                      b2.tolist() if len(b2) > 0 else []]
-        scores_list = [sc1.tolist() if len(sc1) > 0 else [],
-                       sc2.tolist() if len(sc2) > 0 else []]
-        labels_list = [c1.tolist() if len(c1) > 0 else [],
-                       c2.tolist() if len(c2) > 0 else []]
+        boxes_list, scores_list, labels_list = [], [], []
+        for session, imgsz in models:
+            inp_name = session.get_inputs()[0].name
+            inp, scale, pad_x, pad_y = preprocess(img_arr, imgsz)
+            out = session.run(None, {inp_name: inp})
+            b, s, c = decode(out[0], scale, pad_x, pad_y, w, h, 0.01)
+            boxes_list.append(b.tolist() if len(b) > 0 else [])
+            scores_list.append(s.tolist() if len(s) > 0 else [])
+            labels_list.append(c.tolist() if len(c) > 0 else [])
 
         boxes_f, scores_f, labels_f = weighted_boxes_fusion(
             boxes_list, scores_list, labels_list,
-            weights=[1.0, 0.8],
+            weights=weights,
             iou_thr=0.5,
             skip_box_thr=0.001,
         )

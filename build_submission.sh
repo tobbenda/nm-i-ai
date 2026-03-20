@@ -7,7 +7,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-WEIGHTS="${1:-$SCRIPT_DIR/model_1536.onnx}"
+WEIGHTS="${1:-$SCRIPT_DIR/model_a_1536.onnx}"
 OUTPUT="$(cd "$SCRIPT_DIR" && pwd)/${2:-submission.zip}"
 
 RED='\033[0;31m'
@@ -97,8 +97,9 @@ echo ""
 echo "--- Building submission.zip ---"
 TMPDIR=$(mktemp -d)
 cp "$SCRIPT_DIR/run.py" "$TMPDIR/"
-cp "$SCRIPT_DIR/model_1536.onnx" "$TMPDIR/"
-cp "$SCRIPT_DIR/model_1280.onnx" "$TMPDIR/"
+cp "$SCRIPT_DIR/model_a_1536.onnx" "$TMPDIR/"
+cp "$SCRIPT_DIR/model_b_1536.onnx" "$TMPDIR/"
+cp "$SCRIPT_DIR/model_a_1280.onnx" "$TMPDIR/"
 
 # Copy any additional .py files (not train/evaluate/build scripts)
 for f in "$SCRIPT_DIR"/*.py; do
@@ -132,17 +133,13 @@ else
     fail "run.py missing from zip"
 fi
 
-if zipinfo -1 "$OUTPUT" | grep -q "model_1536.onnx"; then
-    pass "model_1536.onnx in zip"
-else
-    fail "model_1536.onnx missing from zip"
-fi
-
-if zipinfo -1 "$OUTPUT" | grep -q "model_1280.onnx"; then
-    pass "model_1280.onnx in zip"
-else
-    fail "model_1280.onnx missing from zip"
-fi
+for mf in model_a_1536.onnx model_b_1536.onnx model_a_1280.onnx; do
+    if zipinfo -1 "$OUTPUT" | grep -q "$mf"; then
+        pass "$mf in zip"
+    else
+        fail "$mf missing from zip"
+    fi
+done
 
 ZIP_PY_COUNT=$(zipinfo -1 "$OUTPUT" | grep -c "\.py$" || true)
 if [ "$ZIP_PY_COUNT" -le 10 ]; then
@@ -156,7 +153,7 @@ echo ""
 echo "--- Dry-run extraction test ---"
 TESTDIR=$(mktemp -d)
 unzip -q "$OUTPUT" -d "$TESTDIR"
-if [ -f "$TESTDIR/run.py" ] && [ -f "$TESTDIR/model_1536.onnx" ] && [ -f "$TESTDIR/model_1280.onnx" ]; then
+if [ -f "$TESTDIR/run.py" ] && [ -f "$TESTDIR/model_a_1536.onnx" ] && [ -f "$TESTDIR/model_b_1536.onnx" ] && [ -f "$TESTDIR/model_a_1280.onnx" ]; then
     pass "Extracted structure valid"
 else
     fail "Extraction missing required files"
