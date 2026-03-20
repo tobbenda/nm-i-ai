@@ -5,114 +5,65 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 import onnxruntime as ort
+from ensemble_boxes import weighted_boxes_fusion
 
 
-def nms(boxes, scores, iou_threshold=0.5):
-    """Non-maximum suppression on [x1, y1, x2, y2] boxes."""
-    if len(boxes) == 0:
-        return []
-    x1, y1, x2, y2 = boxes[:, 0], boxes[:, 1], boxes[:, 2], boxes[:, 3]
-    areas = (x2 - x1) * (y2 - y1)
-    order = scores.argsort()[::-1]
-    keep = []
-    while len(order) > 0:
-        i = order[0]
-        keep.append(i)
-        if len(order) == 1:
-            break
-        xx1 = np.maximum(x1[i], x1[order[1:]])
-        yy1 = np.maximum(y1[i], y1[order[1:]])
-        xx2 = np.minimum(x2[i], x2[order[1:]])
-        yy2 = np.minimum(y2[i], y2[order[1:]])
-        inter = np.maximum(0, xx2 - xx1) * np.maximum(0, yy2 - yy1)
-        union = areas[i] + areas[order[1:]] - inter
-        iou = np.where(union > 0, inter / union, 0.0)
-        inds = np.where(iou <= iou_threshold)[0]
-        order = order[inds + 1]
-    return keep
-
-
-def preprocess(img_path, imgsz=1536):
-    """Load and preprocess image for YOLO ONNX model."""
-    img = Image.open(img_path).convert("RGB")
-    orig_w, orig_h = img.size
-
-    # Letterbox resize
+def preprocess(img_arr, imgsz=1536):
+    """Letterbox resize + normalize for YOLO ONNX."""
+    orig_h, orig_w = img_arr.shape[:2]
     scale = min(imgsz / orig_w, imgsz / orig_h)
     new_w, new_h = int(orig_w * scale), int(orig_h * scale)
-    img_resized = img.resize((new_w, new_h), Image.BILINEAR)
 
-    # Pad to imgsz x imgsz
-    padded = Image.new("RGB", (imgsz, imgsz), (114, 114, 114))
+    img = Image.fromarray(img_arr).resize((new_w, new_h), Image.BILINEAR)
+    padded = np.full((imgsz, imgsz, 3), 114, dtype=np.uint8)
     pad_x, pad_y = (imgsz - new_w) // 2, (imgsz - new_h) // 2
-    padded.paste(img_resized, (pad_x, pad_y))
+    padded[pad_y:pad_y + new_h, pad_x:pad_x + new_w] = np.array(img)
 
-    # To numpy BCHW float32 [0, 1]
-    arr = np.array(padded, dtype=np.float32) / 255.0
+    arr = padded.astype(np.float32) / 255.0
     arr = np.transpose(arr, (2, 0, 1))[np.newaxis, ...]
+    return arr, scale, pad_x, pad_y
 
-    return arr, scale, pad_x, pad_y, orig_w, orig_h
 
-
-def postprocess(output, scale, pad_x, pad_y, orig_w, orig_h,
-                conf_threshold=0.01, iou_threshold=0.5):
-    """Post-process YOLO ONNX output to COCO-format predictions."""
-    # output shape: (1, 360, N) -> transpose to (N, 360)
-    preds = output[0].transpose(1, 0)  # (N, 360)
-
-    # Split: first 4 = bbox (cx, cy, w, h), rest = class scores
+def decode(output, scale, pad_x, pad_y, img_w, img_h, conf=0.01):
+    """Decode ONNX output to normalized [0,1] boxes, scores, class_ids."""
+    preds = output[0].transpose(1, 0)
     boxes_cxcywh = preds[:, :4]
     class_scores = preds[:, 4:]
 
-    # Get best class per box
     max_scores = class_scores.max(axis=1)
     class_ids = class_scores.argmax(axis=1)
 
-    # Filter by confidence
-    mask = max_scores > conf_threshold
+    mask = max_scores > conf
     boxes_cxcywh = boxes_cxcywh[mask]
     max_scores = max_scores[mask]
     class_ids = class_ids[mask]
 
     if len(boxes_cxcywh) == 0:
-        return []
+        return np.empty((0, 4)), np.empty(0), np.empty(0, dtype=int)
 
-    # Convert cx,cy,w,h to x1,y1,x2,y2
-    x1 = boxes_cxcywh[:, 0] - boxes_cxcywh[:, 2] / 2
-    y1 = boxes_cxcywh[:, 1] - boxes_cxcywh[:, 3] / 2
-    x2 = boxes_cxcywh[:, 0] + boxes_cxcywh[:, 2] / 2
-    y2 = boxes_cxcywh[:, 1] + boxes_cxcywh[:, 3] / 2
-    boxes_xyxy = np.stack([x1, y1, x2, y2], axis=1)
+    # To x1,y1,x2,y2 in original image coords
+    x1 = (boxes_cxcywh[:, 0] - boxes_cxcywh[:, 2] / 2 - pad_x) / scale
+    y1 = (boxes_cxcywh[:, 1] - boxes_cxcywh[:, 3] / 2 - pad_y) / scale
+    x2 = (boxes_cxcywh[:, 0] + boxes_cxcywh[:, 2] / 2 - pad_x) / scale
+    y2 = (boxes_cxcywh[:, 1] + boxes_cxcywh[:, 3] / 2 - pad_y) / scale
 
-    # Undo letterbox: remove padding, then unscale
-    boxes_xyxy[:, 0] = (boxes_xyxy[:, 0] - pad_x) / scale
-    boxes_xyxy[:, 1] = (boxes_xyxy[:, 1] - pad_y) / scale
-    boxes_xyxy[:, 2] = (boxes_xyxy[:, 2] - pad_x) / scale
-    boxes_xyxy[:, 3] = (boxes_xyxy[:, 3] - pad_y) / scale
+    # Normalize to [0,1] for WBF
+    boxes_norm = np.stack([
+        np.clip(x1 / img_w, 0, 1),
+        np.clip(y1 / img_h, 0, 1),
+        np.clip(x2 / img_w, 0, 1),
+        np.clip(y2 / img_h, 0, 1),
+    ], axis=1)
 
-    # Clip to image bounds
-    boxes_xyxy[:, 0] = np.clip(boxes_xyxy[:, 0], 0, orig_w)
-    boxes_xyxy[:, 1] = np.clip(boxes_xyxy[:, 1], 0, orig_h)
-    boxes_xyxy[:, 2] = np.clip(boxes_xyxy[:, 2], 0, orig_w)
-    boxes_xyxy[:, 3] = np.clip(boxes_xyxy[:, 3], 0, orig_h)
+    return boxes_norm, max_scores, class_ids
 
-    # Class-agnostic NMS for detection focus
-    keep = nms(boxes_xyxy, max_scores, iou_threshold)
-    boxes_xyxy = boxes_xyxy[keep]
-    max_scores = max_scores[keep]
-    class_ids = class_ids[keep]
 
-    # Convert to COCO format [x, y, w, h]
-    results = []
-    for i in range(len(boxes_xyxy)):
-        bx1, by1, bx2, by2 = boxes_xyxy[i]
-        results.append({
-            "category_id": int(class_ids[i]),
-            "bbox": [round(float(bx1), 1), round(float(by1), 1),
-                     round(float(bx2 - bx1), 1), round(float(by2 - by1), 1)],
-            "score": round(float(max_scores[i]), 3),
-        })
-    return results
+def run_at_scale(session, input_name, img_arr, imgsz, conf=0.01):
+    """Run detection at a given image size."""
+    h, w = img_arr.shape[:2]
+    inp, scale, pad_x, pad_y = preprocess(img_arr, imgsz)
+    output = session.run(None, {input_name: inp})
+    return decode(output[0], scale, pad_x, pad_y, w, h, conf)
 
 
 def main():
@@ -133,17 +84,36 @@ def main():
         if img_path.suffix.lower() not in (".jpg", ".jpeg", ".png"):
             continue
         image_id = int(img_path.stem.split("_")[-1])
+        img_arr = np.array(Image.open(img_path).convert("RGB"))
+        h, w = img_arr.shape[:2]
 
-        inp, scale, pad_x, pad_y, orig_w, orig_h = preprocess(str(img_path), imgsz=1536)
-        outputs = session.run(None, {input_name: inp})
+        # Run at two scales
+        b1, s1, c1 = run_at_scale(session, input_name, img_arr, 1536, 0.01)
+        b2, s2, c2 = run_at_scale(session, input_name, img_arr, 1280, 0.01)
 
-        dets = postprocess(
-            outputs[0], scale, pad_x, pad_y, orig_w, orig_h,
-            conf_threshold=0.01, iou_threshold=0.5,
+        boxes_list = [b1.tolist() if len(b1) > 0 else [],
+                      b2.tolist() if len(b2) > 0 else []]
+        scores_list = [s1.tolist() if len(s1) > 0 else [],
+                       s2.tolist() if len(s2) > 0 else []]
+        labels_list = [c1.tolist() if len(c1) > 0 else [],
+                       c2.tolist() if len(c2) > 0 else []]
+
+        boxes_f, scores_f, labels_f = weighted_boxes_fusion(
+            boxes_list, scores_list, labels_list,
+            weights=[1.0, 0.8],
+            iou_thr=0.5,
+            skip_box_thr=0.001,
         )
-        for d in dets:
-            d["image_id"] = image_id
-            predictions.append(d)
+
+        for i in range(len(boxes_f)):
+            x1, y1, x2, y2 = boxes_f[i]
+            predictions.append({
+                "image_id": image_id,
+                "category_id": int(labels_f[i]),
+                "bbox": [round(x1 * w, 1), round(y1 * h, 1),
+                         round((x2 - x1) * w, 1), round((y2 - y1) * h, 1)],
+                "score": round(float(scores_f[i]), 3),
+            })
 
     Path(args.output).parent.mkdir(parents=True, exist_ok=True)
     with open(args.output, "w") as f:
