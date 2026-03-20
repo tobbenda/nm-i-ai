@@ -7,7 +7,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-WEIGHTS="${1:-$SCRIPT_DIR/best.pt}"
+WEIGHTS="${1:-$SCRIPT_DIR/best.onnx}"
 OUTPUT="$(cd "$SCRIPT_DIR" && pwd)/${2:-submission.zip}"
 
 RED='\033[0;31m'
@@ -97,7 +97,7 @@ echo ""
 echo "--- Building submission.zip ---"
 TMPDIR=$(mktemp -d)
 cp "$SCRIPT_DIR/run.py" "$TMPDIR/"
-cp "$WEIGHTS" "$TMPDIR/best.pt"
+cp "$WEIGHTS" "$TMPDIR/$(basename "$WEIGHTS")"
 
 # Copy any additional .py files (not train/evaluate/build scripts)
 for f in "$SCRIPT_DIR"/*.py; do
@@ -131,10 +131,11 @@ else
     fail "run.py missing from zip"
 fi
 
-if zipinfo -1 "$OUTPUT" | grep -q "best.pt"; then
-    pass "best.pt in zip"
+WEIGHT_NAME=$(basename "$WEIGHTS")
+if zipinfo -1 "$OUTPUT" | grep -q "$WEIGHT_NAME"; then
+    pass "$WEIGHT_NAME in zip"
 else
-    fail "best.pt missing from zip"
+    fail "$WEIGHT_NAME missing from zip"
 fi
 
 ZIP_PY_COUNT=$(zipinfo -1 "$OUTPUT" | grep -c "\.py$" || true)
@@ -149,7 +150,7 @@ echo ""
 echo "--- Dry-run extraction test ---"
 TESTDIR=$(mktemp -d)
 unzip -q "$OUTPUT" -d "$TESTDIR"
-if [ -f "$TESTDIR/run.py" ] && [ -f "$TESTDIR/best.pt" ]; then
+if [ -f "$TESTDIR/run.py" ] && [ -f "$TESTDIR/$WEIGHT_NAME" ]; then
     pass "Extracted structure valid"
 else
     fail "Extraction missing required files"
