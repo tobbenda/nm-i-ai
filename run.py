@@ -19,7 +19,7 @@ def main():
         if img.suffix.lower() not in (".jpg", ".jpeg", ".png"):
             continue
         image_id = int(img.stem.split("_")[-1])
-        results = model(str(img), device=device, verbose=False, conf=0.01, imgsz=1280, augment=True)
+        results = model(str(img), device=device, verbose=False, conf=0.01, imgsz=1536, iou=0.5)
         for r in results:
             if r.boxes is None:
                 continue

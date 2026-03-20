@@ -38,7 +38,7 @@ BLOCKED_IMPORTS="os|sys|subprocess|socket|ctypes|builtins|importlib|pickle|marsh
 SECURITY_FAIL=0
 for pyfile in "$SCRIPT_DIR"/*.py; do
     fname=$(basename "$pyfile")
-    [[ "$fname" == "train.py" || "$fname" == "evaluate.py" ]] && continue
+    [[ "$fname" == "train.py" || "$fname" == "evaluate.py" || "$fname" == "train_experiment.py" || "$fname" == "eval_quick.py" ]] && continue
     # Check for blocked imports
     if grep -nE "^import ($BLOCKED_IMPORTS)$|^from ($BLOCKED_IMPORTS)" "$pyfile" 2>/dev/null; then
         fail "Security: $fname contains blocked import (see above)"
@@ -85,7 +85,7 @@ fi
 # --- 3. Count .py files ---
 echo ""
 echo "--- Checking file counts ---"
-PY_COUNT=$(find "$SCRIPT_DIR" -maxdepth 1 -name "*.py" -not -name "train.py" -not -name "evaluate.py" -not -name "build_submission.sh" | wc -l | tr -d ' ')
+PY_COUNT=$(find "$SCRIPT_DIR" -maxdepth 1 -name "*.py" -not -name "train.py" -not -name "evaluate.py" -not -name "train_experiment.py" -not -name "eval_quick.py" | wc -l | tr -d ' ')
 if [ "$PY_COUNT" -le 10 ]; then
     pass ".py file count: $PY_COUNT (max 10)"
 else
@@ -102,7 +102,7 @@ cp "$WEIGHTS" "$TMPDIR/best.pt"
 # Copy any additional .py files (not train/evaluate/build scripts)
 for f in "$SCRIPT_DIR"/*.py; do
     fname=$(basename "$f")
-    if [[ "$fname" != "run.py" && "$fname" != "train.py" && "$fname" != "evaluate.py" ]]; then
+    if [[ "$fname" != "run.py" && "$fname" != "train.py" && "$fname" != "evaluate.py" && "$fname" != "train_experiment.py" && "$fname" != "eval_quick.py" ]]; then
         cp "$f" "$TMPDIR/"
     fi
 done
