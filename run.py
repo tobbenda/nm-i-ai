@@ -65,13 +65,13 @@ def main():
     base = Path(__file__).parent
     providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
 
-    # Load 3 models: A@1536, B@1536, A@1280
+    # Load 3 models: A@2048, A@1536, B@1536
     models = [
+        (ort.InferenceSession(str(base / "model_a_2048.onnx"), providers=providers), 2048),
         (ort.InferenceSession(str(base / "model_a_1536.onnx"), providers=providers), 1536),
         (ort.InferenceSession(str(base / "model_b_1536.onnx"), providers=providers), 1536),
-        (ort.InferenceSession(str(base / "model_a_1280.onnx"), providers=providers), 1280),
     ]
-    weights = [1.0, 0.8, 0.6]
+    weights = [1.0, 1.0, 0.8]
 
     predictions = []
 

@@ -97,9 +97,9 @@ echo ""
 echo "--- Building submission.zip ---"
 TMPDIR=$(mktemp -d)
 cp "$SCRIPT_DIR/run.py" "$TMPDIR/"
+cp "$SCRIPT_DIR/model_a_2048.onnx" "$TMPDIR/"
 cp "$SCRIPT_DIR/model_a_1536.onnx" "$TMPDIR/"
 cp "$SCRIPT_DIR/model_b_1536.onnx" "$TMPDIR/"
-cp "$SCRIPT_DIR/model_a_1280.onnx" "$TMPDIR/"
 
 # Copy any additional .py files (not train/evaluate/build scripts)
 for f in "$SCRIPT_DIR"/*.py; do
@@ -133,7 +133,7 @@ else
     fail "run.py missing from zip"
 fi
 
-for mf in model_a_1536.onnx model_b_1536.onnx model_a_1280.onnx; do
+for mf in model_a_2048.onnx model_a_1536.onnx model_b_1536.onnx; do
     if zipinfo -1 "$OUTPUT" | grep -q "$mf"; then
         pass "$mf in zip"
     else
@@ -153,7 +153,7 @@ echo ""
 echo "--- Dry-run extraction test ---"
 TESTDIR=$(mktemp -d)
 unzip -q "$OUTPUT" -d "$TESTDIR"
-if [ -f "$TESTDIR/run.py" ] && [ -f "$TESTDIR/model_a_1536.onnx" ] && [ -f "$TESTDIR/model_b_1536.onnx" ] && [ -f "$TESTDIR/model_a_1280.onnx" ]; then
+if [ -f "$TESTDIR/run.py" ] && [ -f "$TESTDIR/model_a_2048.onnx" ] && [ -f "$TESTDIR/model_a_1536.onnx" ] && [ -f "$TESTDIR/model_b_1536.onnx" ]; then
     pass "Extracted structure valid"
 else
     fail "Extraction missing required files"
