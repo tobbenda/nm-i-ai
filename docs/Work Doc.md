@@ -33,3 +33,5 @@ ___
 19 21:59 - (agent) Re-read competition docs — found critical issue: trained with ultralytics 8.4.24 but sandbox has 8.1.0 (weights incompatible). Need to retrain pinned or export ONNX
 19 22:19 - (agent) Fixed: retrained with ultralytics==8.1.0, removed torch.load patch from run.py, added security scan to build script. Training v2 running on A100
 19 22:51 - (agent) Training v2 complete — mAP@0.5=0.682, mAP@0.5:0.95=0.453. Downloaded best.pt, rebuilt submission.zip (120MB, all checks pass). Ready to upload
+22 00:15 - Full compliance audit of run.py against NorgesGruppen docs: all submission format, contract, security, and runtime constraints pass. Identified safety gaps (no error handling, no time budget)
+22 00:29 - Added safety improvements to run.py: try/except around model loading (graceful degradation), per-image error handling, time budget with 15s reserve (writes partial results)
