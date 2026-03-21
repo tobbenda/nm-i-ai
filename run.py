@@ -81,8 +81,11 @@ def main():
         image_id = int(img_path.stem.split("_")[-1])
         img_arr = np.array(Image.open(img_path).convert("RGB"))
         h, w = img_arr.shape[:2]
+        img_flipped = img_arr[:, ::-1, :].copy()
 
         boxes_list, scores_list, labels_list = [], [], []
+
+        # Normal passes
         for session, imgsz in models:
             inp_name = session.get_inputs()[0].name
             inp, scale, pad_x, pad_y = preprocess(img_arr, imgsz)
@@ -92,9 +95,27 @@ def main():
             scores_list.append(s.tolist() if len(s) > 0 else [])
             labels_list.append(c.tolist() if len(c) > 0 else [])
 
+        # Horizontal flip TTA on model A@1536
+        flip_session, flip_imgsz = models[0]
+        inp_name = flip_session.get_inputs()[0].name
+        inp, scale, pad_x, pad_y = preprocess(img_flipped, flip_imgsz)
+        out = flip_session.run(None, {inp_name: inp})
+        b_flip, s_flip, c_flip = decode(out[0], scale, pad_x, pad_y, w, h, 0.01)
+        if len(b_flip) > 0:
+            # Mirror boxes back: x1_new = 1 - x2_old, x2_new = 1 - x1_old
+            b_mirrored = b_flip.copy()
+            b_mirrored[:, 0] = 1 - b_flip[:, 2]
+            b_mirrored[:, 2] = 1 - b_flip[:, 0]
+            b_flip = b_mirrored
+        boxes_list.append(b_flip.tolist() if len(b_flip) > 0 else [])
+        scores_list.append(s_flip.tolist() if len(s_flip) > 0 else [])
+        labels_list.append(c_flip.tolist() if len(c_flip) > 0 else [])
+
+        all_weights = weights + [0.5]  # flip gets lower weight
+
         boxes_f, scores_f, labels_f = weighted_boxes_fusion(
             boxes_list, scores_list, labels_list,
-            weights=weights,
+            weights=all_weights,
             iou_thr=0.5,
             skip_box_thr=0.001,
         )
