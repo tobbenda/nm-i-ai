@@ -49,3 +49,7 @@ ___
 20 15:41 - (agent) yolo_tuned: worse (mAP 0.653 vs 0.682 baseline), killed. yolo_fulldata: done, ONNX exported. Built DINOv2 gallery (326 products, 454KB). Testing DINOv2 crop classification on val set
 20 15:47 - (agent) DINOv2 classification: worse at all thresholds (cls dropped 0.825→0.807 even conservatively). Ref images too different from shelf crops. Dead end without fine-tuning
 20 16:50 - (agent) Built submission with fulldata model + WBF ensemble (1536+1280). Verified on VM2 — 37K predictions, pipeline works. 212MB zip, all checks pass
+20 18:45 - (agent) 3-scale WBF no better than 2-scale. Spun up VM3+VM4 (us-east1-b). Training 4 diverse fulldata models across 4 VMs for multi-model WBF ensemble (different seeds, LRs, imgsz)
+20 20:01 - (agent) Submitted fulldata_v2 + WBF — competition score improved slightly. fulldata_v2 ONNX exported. VM1 ensemble_b near done, VM3/VM4 restarted after OpenCV fix. Preparing multi-model ensemble
+20 20:09 - (agent) FP16 quantization: 131MB per model (half of FP32). Built 2-model WBF submission with model_1536 + model_1280 (fulldata_v2, FP16). 241MB zip, all checks pass. VM3/VM4 still training for potential 3rd model
+20 23:34 - (agent) Multi-model WBF tested: 3-way ensemble (modelA@1536 + modelB@1536 + modelA@1280) = new best final=0.8902 (+0.5%). cls_mAP jumped to 0.8475. All VMs done. Need fulldata versions for submission
