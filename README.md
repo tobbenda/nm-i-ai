@@ -1,6 +1,6 @@
 # NM i AI 2026 -- NorgesGruppen Product Detection
 
-Grocery shelf product detection and classification for the [NM i AI 2026](https://www.norskindustri.no/nm-i-ai/) competition (NorgesGruppen challenge).
+Grocery shelf product detection and classification for the NM i AI 2026 competition (NorgesGruppen challenge).
 
 **Final score: 0.9143**
 
