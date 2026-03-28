@@ -55,3 +55,5 @@ ___
 20 23:34 - (agent) Multi-model WBF tested: 3-way ensemble (modelA@1536 + modelB@1536 + modelA@1280) = new best final=0.8902 (+0.5%). cls_mAP jumped to 0.8475. All VMs done. Need fulldata versions for submission
 22 00:15 - Full compliance audit of run.py against NorgesGruppen docs: all submission format, contract, security, and runtime constraints pass. Identified safety gaps (no error handling, no time budget)
 22 00:29 - Added safety improvements to run.py: try/except around model loading (graceful degradation), per-image error handling, time budget with 15s reserve (writes partial results)
+28 07:57 - Post-competition cleanup: merged training branch into main, merged work doc logs from both worktrees, updated results.md with full experiment history, pruned stale worktree
+28 07:59 - Updated README with problem description, solution architecture, what worked/didn't work tables

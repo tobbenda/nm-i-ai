@@ -10,6 +10,11 @@ sandbox_test/
 submission/
 output/
 
+# Extracted data
+data/coco_dataset/
+data/product_images/
+
 # Misc
 excalidraw.log
+report.html
 __pycache__/
