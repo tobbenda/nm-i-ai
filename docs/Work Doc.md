@@ -35,5 +35,23 @@ ___
 19 21:59 - (agent) Re-read competition docs — found critical issue: trained with ultralytics 8.4.24 but sandbox has 8.1.0 (weights incompatible). Need to retrain pinned or export ONNX
 19 22:19 - (agent) Fixed: retrained with ultralytics==8.1.0, removed torch.load patch from run.py, added security scan to build script. Training v2 running on A100
 19 22:51 - (agent) Training v2 complete — mAP@0.5=0.682, mAP@0.5:0.95=0.453. Downloaded best.pt, rebuilt submission.zip (120MB, all checks pass). Ready to upload
+19 23:22 - (agent) Ran 11 inference experiments: conf=0.01+TTA is best (det_mAP 0.883→0.902). Updated run.py. Launched 5 training experiments on A100 (YOLOv8l, imgsz=1536, heavy aug, lower LR, SGD)
+20 01:17 - (agent) Phase 1 complete. Best: YOLOv8x trained at imgsz=1536 + conf=0.01 + NMS=0.5 → det_mAP=0.906 (+2.5% over baseline). Heavy aug/lower LR/SGD/YOLOv8l all worse. Submission rebuilt
+20 09:41 - Checked gcloud quotas: 1 A100 active in us-central1, 200GB SSD used. GPU quotas generous (16 A100 on-demand, 64 spot per region). A100 80GB quota is 0 everywhere
+20 09:41 - (agent) Switched to ONNX inference after .pt submission failed (torch.load weights_only issue). ONNX det_mAP=0.911 (better than .pt 0.906). No blocked imports, 212MB zip. Ready to submit
+20 10:05 - Researched GCP AI services for competition: Vertex AI AutoML, Model Garden, Vision API, TPUs. Assessed feasibility against competition constraints (offline sandbox, 300s limit, L4 GPU)
+20 10:14 - (agent) Mapped 326 product reference images to 321 categories. Generated 2724 synthetic training images (pasting cutouts onto shelf crops). Training YOLOv8x on augmented dataset (2885 images, imgsz=1536)
+20 12:19 - (agent) Restructured repo: experiments/ per model, scripts/ shared. Created a100-vm-2 (us-central1-f). RT-DETR training launched (needed ultralytics 8.4.24, will ONNX export). Ref_aug at ep30 looks bad (mAP 0.44 vs 0.68 baseline) — synthetic data too artificial
+20 13:31 - (agent) RT-DETR: total failure (mAP=0.000, 0 predictions) — transformer needs way more data than 248 images. Ref_aug at ep47: mAP=0.525, still bad. Both dead ends. Best remains yolo_imgsz1536 (det_mAP=0.911 via ONNX)
+20 14:17 - Deep research on 10 improvement approaches: SAHI/tiling, WBF ensemble, two-stage detect+classify with DINOv2 embeddings, training tricks, template matching, few-shot, pseudo-labeling, cross-validation. Ranked by expected impact and feasibility
+20 14:50 - (agent) SAHI tiling tested: det_mAP dropped 0.911→0.880 (too many FPs from tile boundaries). Reverted. Launched yolo_tuned (VM1) and yolo_fulldata (VM2). Next: WBF multi-scale ensemble
+20 14:58 - (agent) WBF ensemble (1536+1280): det slightly worse (0.908 vs 0.911) but cls +1.6% (0.841 vs 0.825). Final score improved 0.885→0.888. Needs dynamic ONNX export
+20 15:41 - (agent) yolo_tuned: worse (mAP 0.653 vs 0.682 baseline), killed. yolo_fulldata: done, ONNX exported. Built DINOv2 gallery (326 products, 454KB). Testing DINOv2 crop classification on val set
+20 15:47 - (agent) DINOv2 classification: worse at all thresholds (cls dropped 0.825→0.807 even conservatively). Ref images too different from shelf crops. Dead end without fine-tuning
+20 16:50 - (agent) Built submission with fulldata model + WBF ensemble (1536+1280). Verified on VM2 — 37K predictions, pipeline works. 212MB zip, all checks pass
+20 18:45 - (agent) 3-scale WBF no better than 2-scale. Spun up VM3+VM4 (us-east1-b). Training 4 diverse fulldata models across 4 VMs for multi-model WBF ensemble (different seeds, LRs, imgsz)
+20 20:01 - (agent) Submitted fulldata_v2 + WBF — competition score improved slightly. fulldata_v2 ONNX exported. VM1 ensemble_b near done, VM3/VM4 restarted after OpenCV fix. Preparing multi-model ensemble
+20 20:09 - (agent) FP16 quantization: 131MB per model (half of FP32). Built 2-model WBF submission with model_1536 + model_1280 (fulldata_v2, FP16). 241MB zip, all checks pass. VM3/VM4 still training for potential 3rd model
+20 23:34 - (agent) Multi-model WBF tested: 3-way ensemble (modelA@1536 + modelB@1536 + modelA@1280) = new best final=0.8902 (+0.5%). cls_mAP jumped to 0.8475. All VMs done. Need fulldata versions for submission
 22 00:15 - Full compliance audit of run.py against NorgesGruppen docs: all submission format, contract, security, and runtime constraints pass. Identified safety gaps (no error handling, no time budget)
 22 00:29 - Added safety improvements to run.py: try/except around model loading (graceful degradation), per-image error handling, time budget with 15s reserve (writes partial results)
