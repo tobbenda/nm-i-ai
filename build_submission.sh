@@ -7,7 +7,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-WEIGHTS="${1:-$SCRIPT_DIR/best.pt}"
+WEIGHTS="${1:-$SCRIPT_DIR/model_a_1536.onnx}"
 OUTPUT="$(cd "$SCRIPT_DIR" && pwd)/${2:-submission.zip}"
 
 RED='\033[0;31m'
@@ -38,7 +38,7 @@ BLOCKED_IMPORTS="os|sys|subprocess|socket|ctypes|builtins|importlib|pickle|marsh
 SECURITY_FAIL=0
 for pyfile in "$SCRIPT_DIR"/*.py; do
     fname=$(basename "$pyfile")
-    [[ "$fname" == "train.py" || "$fname" == "evaluate.py" ]] && continue
+    [[ "$fname" == "train.py" || "$fname" == "evaluate.py" || "$fname" == "train_experiment.py" || "$fname" == "eval_quick.py" ]] && continue
     # Check for blocked imports
     if grep -nE "^import ($BLOCKED_IMPORTS)$|^from ($BLOCKED_IMPORTS)" "$pyfile" 2>/dev/null; then
         fail "Security: $fname contains blocked import (see above)"
@@ -85,7 +85,7 @@ fi
 # --- 3. Count .py files ---
 echo ""
 echo "--- Checking file counts ---"
-PY_COUNT=$(find "$SCRIPT_DIR" -maxdepth 1 -name "*.py" -not -name "train.py" -not -name "evaluate.py" -not -name "build_submission.sh" | wc -l | tr -d ' ')
+PY_COUNT=$(find "$SCRIPT_DIR" -maxdepth 1 -name "*.py" -not -name "train.py" -not -name "evaluate.py" -not -name "train_experiment.py" -not -name "eval_quick.py" | wc -l | tr -d ' ')
 if [ "$PY_COUNT" -le 10 ]; then
     pass ".py file count: $PY_COUNT (max 10)"
 else
@@ -97,12 +97,14 @@ echo ""
 echo "--- Building submission.zip ---"
 TMPDIR=$(mktemp -d)
 cp "$SCRIPT_DIR/run.py" "$TMPDIR/"
-cp "$WEIGHTS" "$TMPDIR/best.pt"
+cp "$SCRIPT_DIR/model_a_1536.onnx" "$TMPDIR/"
+cp "$SCRIPT_DIR/model_b_1536.onnx" "$TMPDIR/"
+cp "$SCRIPT_DIR/model_a_1280.onnx" "$TMPDIR/"
 
 # Copy any additional .py files (not train/evaluate/build scripts)
 for f in "$SCRIPT_DIR"/*.py; do
     fname=$(basename "$f")
-    if [[ "$fname" != "run.py" && "$fname" != "train.py" && "$fname" != "evaluate.py" ]]; then
+    if [[ "$fname" != "run.py" && "$fname" != "train.py" && "$fname" != "evaluate.py" && "$fname" != "train_experiment.py" && "$fname" != "eval_quick.py" ]]; then
         cp "$f" "$TMPDIR/"
     fi
 done
@@ -131,11 +133,13 @@ else
     fail "run.py missing from zip"
 fi
 
-if zipinfo -1 "$OUTPUT" | grep -q "best.pt"; then
-    pass "best.pt in zip"
-else
-    fail "best.pt missing from zip"
-fi
+for mf in model_a_1536.onnx model_b_1536.onnx model_a_1280.onnx; do
+    if zipinfo -1 "$OUTPUT" | grep -q "$mf"; then
+        pass "$mf in zip"
+    else
+        fail "$mf missing from zip"
+    fi
+done
 
 ZIP_PY_COUNT=$(zipinfo -1 "$OUTPUT" | grep -c "\.py$" || true)
 if [ "$ZIP_PY_COUNT" -le 10 ]; then
@@ -149,7 +153,7 @@ echo ""
 echo "--- Dry-run extraction test ---"
 TESTDIR=$(mktemp -d)
 unzip -q "$OUTPUT" -d "$TESTDIR"
-if [ -f "$TESTDIR/run.py" ] && [ -f "$TESTDIR/best.pt" ]; then
+if [ -f "$TESTDIR/run.py" ] && [ -f "$TESTDIR/model_a_1536.onnx" ] && [ -f "$TESTDIR/model_b_1536.onnx" ] && [ -f "$TESTDIR/model_a_1280.onnx" ]; then
     pass "Extracted structure valid"
 else
     fail "Extraction missing required files"

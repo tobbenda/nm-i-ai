@@ -1,5 +1,4 @@
-# Data & weights
-data/
+# Weights & archives
 *.zip
 *.pt
 *.onnx
